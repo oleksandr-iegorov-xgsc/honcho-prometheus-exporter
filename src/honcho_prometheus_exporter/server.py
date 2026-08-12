@@ -51,6 +51,10 @@ class MetricsHandler(BaseHTTPRequestHandler):
             self.send_response(HTTPStatus.OK)
             content_type = "text/plain; version=0.0.4; charset=utf-8"
         elif self.path == "/healthz":
+            # Health checks must exercise the same read-only snapshot path; otherwise a
+            # newly started container remains unhealthy until Prometheus first scrapes it.
+            if not self.state.has_succeeded:
+                self.state.collect()
             body = b"ok\n" if self.state.has_succeeded else b"no successful database snapshot yet\n"
             self.send_response(
                 HTTPStatus.OK if self.state.has_succeeded else HTTPStatus.SERVICE_UNAVAILABLE

@@ -67,6 +67,8 @@ class PostgresSnapshotReader:
         self, cursor: psycopg.Cursor[dict[str, object]], snapshots: dict[str, WorkspaceSnapshot]
     ) -> None:
         names = list(snapshots)
+        sync_states = ", ".join(f"'{state}'" for state in SYNC_STATES)
+        task_types = ", ".join(f"'{task_type}'" for task_type in TASK_TYPES)
         queries: Iterable[tuple[str, str]] = (
             (
                 "peers",
@@ -90,19 +92,31 @@ class PostgresSnapshotReader:
             ),
             (
                 "message_embeddings",
-                "SELECT workspace_name, sync_state, COUNT(*) value FROM message_embeddings WHERE workspace_name = ANY(%s) GROUP BY 1, 2",
+                "SELECT workspace_name, sync_state, COUNT(*) value "
+                "FROM message_embeddings WHERE workspace_name = ANY(%s) "
+                f"AND sync_state IN ({sync_states}) GROUP BY 1, 2",
             ),
             (
                 "document_embeddings",
-                "SELECT workspace_name, sync_state, COUNT(*) value FROM documents WHERE workspace_name = ANY(%s) GROUP BY 1, 2",
+                "SELECT workspace_name, sync_state, COUNT(*) value "
+                "FROM documents WHERE workspace_name = ANY(%s) "
+                f"AND sync_state IN ({sync_states}) GROUP BY 1, 2",
             ),
             (
                 "queue",
-                "SELECT q.workspace_name, q.task_type, CASE WHEN q.processed THEN 'completed' WHEN a.work_unit_key IS NOT NULL THEN 'in_progress' ELSE 'pending' END state, COUNT(*) value FROM queue q LEFT JOIN active_queue_sessions a ON a.work_unit_key = q.work_unit_key WHERE q.workspace_name = ANY(%s) GROUP BY 1, 2, 3",
+                "SELECT q.workspace_name, q.task_type, CASE WHEN q.processed THEN 'completed' "
+                "WHEN a.work_unit_key IS NOT NULL THEN 'in_progress' ELSE 'pending' END state, "
+                "COUNT(*) value FROM queue q LEFT JOIN active_queue_sessions a "
+                "ON a.work_unit_key = q.work_unit_key WHERE q.workspace_name = ANY(%s) "
+                f"AND q.task_type IN ({task_types}) GROUP BY 1, 2, 3",
             ),
             (
                 "oldest",
-                "SELECT q.workspace_name, q.task_type, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(q.created_at))) age FROM queue q LEFT JOIN active_queue_sessions a ON a.work_unit_key = q.work_unit_key WHERE q.workspace_name = ANY(%s) AND NOT q.processed AND a.work_unit_key IS NULL GROUP BY 1, 2",
+                "SELECT q.workspace_name, q.task_type, EXTRACT(EPOCH FROM "
+                "(CURRENT_TIMESTAMP - MIN(q.created_at))) age FROM queue q "
+                "LEFT JOIN active_queue_sessions a ON a.work_unit_key = q.work_unit_key "
+                "WHERE q.workspace_name = ANY(%s) AND NOT q.processed "
+                f"AND q.task_type IN ({task_types}) AND a.work_unit_key IS NULL GROUP BY 1, 2",
             ),
             (
                 "active_queue_sessions",

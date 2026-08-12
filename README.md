@@ -44,7 +44,8 @@ uv run honcho-prometheus-exporter --config /etc/honcho-exporter/config.json
 Endpoints:
 
 - `GET /metrics`: executes a current aggregate-only snapshot and returns gauges.
-- `GET /healthz`: returns 503 until the first successful snapshot, then 200. A
+- `GET /healthz`: performs the initial aggregate-only snapshot and returns 200
+  after a successful one; it returns 503 while the database is unavailable. A
   later failed scrape does not erase the last confirmed successful readiness.
 
 Metrics cover peers; active/inactive sessions; messages and tokens; collections;

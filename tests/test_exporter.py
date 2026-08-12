@@ -83,7 +83,7 @@ class Reader:
         return [WorkspaceSnapshot(workspace="alpha")]
 
 
-def test_health_requires_a_successful_snapshot() -> None:
+def test_health_exercises_the_first_database_snapshot() -> None:
     state = ExporterState(Reader(), load_config_from_defaults())
     handler = type("TestHandler", (MetricsHandler,), {"state": state})
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -92,11 +92,22 @@ def test_health_requires_a_successful_snapshot() -> None:
     try:
         connection = HTTPConnection("127.0.0.1", server.server_port)
         connection.request("GET", "/healthz")
-        assert connection.getresponse().status == 503
-        connection.request("GET", "/metrics")
         assert connection.getresponse().status == 200
+    finally:
+        server.shutdown()
+        thread.join()
+
+
+def test_health_is_unavailable_when_database_snapshot_fails() -> None:
+    state = ExporterState(Reader(fail=True), load_config_from_defaults())
+    handler = type("TestHandler", (MetricsHandler,), {"state": state})
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        connection = HTTPConnection("127.0.0.1", server.server_port)
         connection.request("GET", "/healthz")
-        assert connection.getresponse().status == 200
+        assert connection.getresponse().status == 503
     finally:
         server.shutdown()
         thread.join()
