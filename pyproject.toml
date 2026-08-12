@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "honcho-prometheus-exporter"
+version = "0.1.0"
+description = "Read-only Prometheus exporter for Honcho PostgreSQL workspace snapshots"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Private"}]
+dependencies = ["psycopg[binary]>=3.2,<4"]
+
+[project.scripts]
+honcho-prometheus-exporter = "honcho_prometheus_exporter.server:main"
+
+[dependency-groups]
+dev = ["build>=1.2", "pytest>=8", "ruff>=0.11"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/honcho_prometheus_exporter"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/honcho_prometheus_exporter/database.py" = ["E501"]
